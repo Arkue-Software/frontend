@@ -10,15 +10,11 @@ jobs:
     runs-on: self-hosted 
 
     steps:
-
-      - name: Permitir sudo sin password para el usuario
-        run: |
-          echo '${{ github.actor }} ALL=(ALL) NOPASSWD: /bin/systemctl' | sudo tee /etc/sudoers.d/ci-worker
       # 1. Descargar el código fuente
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Configurar Node.js (asegúrate de que Node esté instalado o usa una acción compatible)
+      # 2. Configurar Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -28,17 +24,16 @@ jobs:
       # 3. Instalar dependencias y compilar el proyecto
       - name: Install dependencies and build
         run: |
-          sudo npm install
-          sudo npm run build
+          npm install
+          npm run build
 
-      # 4. Copiar los archivos compilados al directorio del servidor web (ej: Nginx)
-      # Al estar en la misma máquina, se hace un movimiento local con permisos
+      # 4. Copiar los archivos compilados al directorio del servidor web
       - name: Copy build to web root
         run: |
-           sudo rm -rf /var/www/html/*
-           sudo cp -r dist/* /var/www/html/
+          sudo rm -rf /var/www/html/*
+          sudo cp -r dist/* /var/www/html/
 
-      # 5. Reiniciar el servidor web (si aplica)
+      # 5. Reiniciar el servidor web
       - name: Restart Nginx
         run: |
-           systemctl restart nginx
+          sudo systemctl restart nginx
