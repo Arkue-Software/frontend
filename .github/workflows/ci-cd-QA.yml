@@ -23,4 +23,4 @@ jobs:
            docker rm arkue-frontend-container || true
           
           # 3. Desplegar el nuevo contenedor mapeando el puerto 80
-           docker run -d --name arkue-frontend-container -p 80:80 arkue-frontend
+           docker run -d --name arkue-frontend-container -p 8080:80 arkue-frontend
