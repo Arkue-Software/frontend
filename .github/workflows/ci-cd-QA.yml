@@ -10,6 +10,10 @@ jobs:
     runs-on: self-hosted 
 
     steps:
+
+      - name: Permitir sudo sin password para el usuario
+        run: |
+          echo '${{ github.actor }} ALL=(ALL) NOPASSWD: /bin/systemctl' | sudo tee /etc/sudoers.d/ci-worker
       # 1. Descargar el código fuente
       - name: Checkout code
         uses: actions/checkout@v4
