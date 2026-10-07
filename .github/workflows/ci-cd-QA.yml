@@ -31,10 +31,10 @@ jobs:
       # Al estar en la misma máquina, se hace un movimiento local con permisos
       - name: Copy build to web root
         run: |
-          sudo rm -rf /var/www/html/*
-          sudo cp -r dist/* /var/www/html/
+           rm -rf /var/www/html/*
+           cp -r dist/* /var/www/html/
 
       # 5. Reiniciar el servidor web (si aplica)
       - name: Restart Nginx
         run: |
-          sudo systemctl restart nginx
+           systemctl restart nginx
