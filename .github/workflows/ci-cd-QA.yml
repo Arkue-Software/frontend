@@ -19,8 +19,8 @@ jobs:
           sudo docker build -t arkue-frontend .
           
           # 2. Detener y eliminar la versión anterior (ignorando errores si no existe)
-          sudo docker stop arkue-frontend-container || true
-          sudo docker rm arkue-frontend-container || true
+           docker stop arkue-frontend-container || true
+           docker rm arkue-frontend-container || true
           
           # 3. Desplegar el nuevo contenedor mapeando el puerto 80
-          sudo docker run -d --name arkue-frontend-container -p 80:80 arkue-frontend
+           docker run -d --name arkue-frontend-container -p 80:80 arkue-frontend
