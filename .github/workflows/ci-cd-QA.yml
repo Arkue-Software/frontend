@@ -16,7 +16,7 @@ jobs:
       - name: Deploy Docker Container
         run: |
           # 1. Construir la nueva imagen de Docker
-          sudo docker build -t arkue-frontend .
+           docker build -t arkue-frontend .
           
           # 2. Detener y eliminar la versión anterior (ignorando errores si no existe)
            docker stop arkue-frontend-container || true
