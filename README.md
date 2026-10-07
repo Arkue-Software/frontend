@@ -18,6 +18,14 @@ npm run dev
 
 Abre `http://localhost:5173`.
 
+### Con Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Abre `http://localhost:8080`. Para usar otro puerto del host, define `FRONTEND_PORT` (por ejemplo, `FRONTEND_PORT=3000 docker compose up --build`). Para detener el servicio, ejecuta `docker compose down`.
+
 ### Otros comandos
 
 | Comando | Qué hace |
