@@ -4,7 +4,8 @@ import { CONFIG } from '@/api/config'
 import type { ErrorApi } from '@/api/errores'
 import { useAccion } from '@/shared/consulta/useConsulta'
 import { nombreCompletoMunicipio } from '@/shared/datos/divipola'
-import { fecha, hoy } from '@/shared/formato'
+import { cumplioAnios, fecha, hoy } from '@/shared/formato'
+import { nuevoId } from '@/shared/utilidades/ids'
 import { useSesion } from '@/shared/sesion/SesionContexto'
 import { Aviso, Boton, CampoTexto, Etiqueta, MensajeError, Tarjeta, unir } from '@/shared/ui/Primitivos'
 import { IndicadorPasos } from '@/shared/ui/Pasos'
@@ -13,13 +14,21 @@ import { IconoCalendario, IconoMedalla, IconoRegistro } from '@/shared/ui/Iconos
 import { useTituloPagina } from '@/shared/useTituloPagina'
 
 /**
- * M1-U2-01 — Crear cuenta de donante (RF-01, POST /v1/donantes).
+ * M1-U2-01 — Crear cuenta de donante (RF-01).
  * M1-U2-02 — Consentimiento de tratamiento de datos (Ley 1581).
  *
  * Es el camino largo y voluntario: el límite de tres pasos de RNF-03 aplica
  * al registro anónimo. Aquí la persona entrega sus datos, y el consentimiento
- * informado exige espacio para leer. Al terminar, la cuenta queda creada en
- * Identidad y el perfil en Donación, y la persona entra con su sesión.
+ * informado exige espacio para leer.
+ *
+ * Al confirmar, la web hace tres pasos, porque los servicios no se llaman
+ * entre sí: crea la cuenta en Identidad (POST /v1/cuentas-donante), inicia la
+ * sesión y, con ella, crea el perfil en Donación (POST /v1/donantes). Si algo
+ * falla a mitad, reintentar no repite lo que ya quedó hecho. Con `completar`,
+ * quien ya tiene cuenta pero no perfil hace solo el último paso.
+ *
+ * Solo pueden crear cuenta los mayores de edad; un menor sigue pudiendo
+ * informarse, pero no donar.
  *
  * El registro anónimo nunca se presenta como una versión inferior.
  */
@@ -34,12 +43,15 @@ const VENTAJAS = [
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function CrearCuenta() {
-  useTituloPagina('Crear cuenta')
+/** Edad mínima para tener cuenta de donante; Donación aplica la misma regla. */
+const EDAD_MINIMA = 18
+
+export function CrearCuenta({ completar = false }: { completar?: boolean }) {
+  useTituloPagina(completar ? 'Completa tu registro' : 'Crear cuenta')
   const { estado, usuario, iniciarSesion } = useSesion()
   const navegar = useNavigate()
   const [paso, setPaso] = useState(1)
-  const [nombre, setNombre] = useState('')
+  const [nombre, setNombre] = useState(completar ? (usuario?.nombre ?? '') : '')
   const [documento, setDocumento] = useState('')
   const [nacimiento, setNacimiento] = useState('')
   const [correo, setCorreo] = useState('')
@@ -49,36 +61,60 @@ export function CrearCuenta() {
   const [municipio, setMunicipio] = useState<string | null>(null)
   const [aceptaDatos, setAceptaDatos] = useState(false)
   const [aceptaAvisos, setAceptaAvisos] = useState(false)
+  // Lo que ya quedó hecho en un intento anterior no se repite: la cuenta se
+  // crea con una sola clave de idempotencia, y el perfil con una por contenido.
+  const claveCuenta = useRef(nuevoId())
+  const perfilEnviado = useRef<{ cuerpo: string; clave: string } | null>(null)
+  const [cuentaLista, setCuentaLista] = useState(completar)
+  const [errorEntrada, setErrorEntrada] = useState(false)
   // registrarDonante no devuelve cuerpo: la accion devuelve true para que el
   // exito se distinga del fallo (useAccion devuelve undefined si falla).
   const registro = useAccion(async (api) => {
-    await api.donantes.registrarDonante({
+    const acceso = completar ? (usuario?.correo ?? '') : correo.trim().toLowerCase()
+    if (!cuentaLista) {
+      await api.identidad.crearCuentaDonante({ correo: acceso, credencial, nombre: nombre.trim() }, claveCuenta.current)
+      try {
+        await iniciarSesion(acceso, credencial)
+      } catch {
+        // La cuenta quedó creada; solo falló la entrada automática.
+        setErrorEntrada(true)
+        return false
+      }
+      setCuentaLista(true)
+    }
+    const datos = {
       documento: documento.trim(),
       nombre: nombre.trim(),
       fechaNacimiento: nacimiento,
-      correoAcceso: correo.trim().toLowerCase(),
-      credencial,
       // El correo de contacto recibe la confirmación de la cuenta; los avisos de
       // jornadas además exigen su autorización, que Donación revisa al enviar.
-      correoContacto: correo.trim().toLowerCase(),
+      correoContacto: acceso,
       telefono: telefono.trim() || null,
       municipioRuta: municipio,
       autorizaTratamiento: aceptaDatos,
       autorizaAvisos: aceptaAvisos,
       versionAviso: CONFIG.versionAvisoPrivacidad,
-    })
+    }
+    const cuerpo = JSON.stringify(datos)
+    if (perfilEnviado.current?.cuerpo !== cuerpo) perfilEnviado.current = { cuerpo, clave: nuevoId() }
+    await api.donantes.registrarDonante(datos, perfilEnviado.current.clave)
     return true
   })
-  const [errorEntrada, setErrorEntrada] = useState(false)
 
-  // Solo quien llega con sesión se redirige; tras crear la cuenta, navega crear().
+  // Solo quien llega con sesión a crear una cuenta se redirige; tras crearla, navega crear().
   const llegoConSesion = useRef(estado === 'activa')
-  if (llegoConSesion.current && usuario) {
+  if (!completar && llegoConSesion.current && usuario) {
     return <Navigate to="/donantes/perfil" replace />
   }
 
   const errDocumento = documento && !/^[A-Za-z0-9]{5,20}$/.test(documento.trim()) ? 'Entre 5 y 20 letras o números, sin puntos ni espacios.' : null
-  const errNacimiento = nacimiento && nacimiento >= hoy() ? 'Debe ser una fecha pasada.' : null
+  const errNacimiento = !nacimiento
+    ? null
+    : nacimiento >= hoy()
+      ? 'Debe ser una fecha pasada.'
+      : !cumplioAnios(nacimiento, EDAD_MINIMA, hoy())
+        ? `Para crear una cuenta de donante debes tener ${EDAD_MINIMA} años cumplidos.`
+        : null
   const identidadCompleta = nombre.trim() !== '' && documento && !errDocumento && nacimiento && !errNacimiento
 
   const errCorreo = correo && !CORREO.test(correo.trim()) ? 'Escribe un correo válido.' : null
@@ -88,20 +124,13 @@ export function CrearCuenta() {
       : null
   const errConfirmacion = confirmacion && confirmacion !== credencial ? 'Las contraseñas no coinciden.' : null
   const errTelefono = telefono && !/^[0-9+ ]{7,20}$/.test(telefono.trim()) ? 'Solo números, espacios y el signo +.' : null
-  const cuentaCompleta =
-    correo && !errCorreo && credencial && !errCredencial && confirmacion === credencial && !errTelefono
+  const cuentaCompleta = completar
+    ? !errTelefono
+    : correo && !errCorreo && credencial && !errCredencial && confirmacion === credencial && !errTelefono
 
   async function crear() {
     setErrorEntrada(false)
-    const creada = await registro.ejecutar()
-    if (!creada) return
-    try {
-      await iniciarSesion(correo.trim().toLowerCase(), credencial)
-      navegar('/donantes/perfil', { replace: true, state: { bienvenida: true } })
-    } catch {
-      // La cuenta quedó creada; solo falló la entrada automática.
-      setErrorEntrada(true)
-    }
+    if (await registro.ejecutar()) navegar('/donantes/perfil', { replace: true, state: { bienvenida: !completar } })
   }
 
   return (
@@ -156,25 +185,31 @@ export function CrearCuenta() {
               <div>
                 <Etiqueta>Paso 2 de 4</Etiqueta>
                 <h1 id="cuenta2" className="mt-4 text-2xl font-bold tracking-tight text-vino-800">
-                  Tu cuenta
+                  {completar ? 'Tu contacto' : 'Tu cuenta'}
                 </h1>
                 <p className="mt-2 text-sm leading-relaxed text-texto-gris">
-                  Con este correo y esta contraseña entrarás a RedVital. Ahí te enviaremos la confirmación de tu cuenta.
+                  {completar
+                    ? `Te escribiremos a ${usuario?.correo ?? 'tu correo'}, el de tu cuenta.`
+                    : 'Con este correo y esta contraseña entrarás a RedVital. Ahí te enviaremos la confirmación de tu cuenta.'}
                 </p>
               </div>
-              <CampoTexto id="correo" etiqueta="Correo electrónico" tipo="email" valor={correo} onCambio={setCorreo} autoComplete="email" inputMode="email" maxLength={160} error={errCorreo} />
-              <CampoTexto
-                id="credencial"
-                etiqueta="Contraseña"
-                tipo="password"
-                valor={credencial}
-                onCambio={setCredencial}
-                autoComplete="new-password"
-                ayuda="Al menos 10 caracteres, con letras y números."
-                maxLength={128}
-                error={errCredencial}
-              />
-              <CampoTexto id="confirmacion" etiqueta="Repite la contraseña" tipo="password" valor={confirmacion} onCambio={setConfirmacion} autoComplete="new-password" maxLength={128} error={errConfirmacion} />
+              {!completar && (
+                <>
+                  <CampoTexto id="correo" etiqueta="Correo electrónico" tipo="email" valor={correo} onCambio={setCorreo} autoComplete="email" inputMode="email" maxLength={160} error={errCorreo} />
+                  <CampoTexto
+                    id="credencial"
+                    etiqueta="Contraseña"
+                    tipo="password"
+                    valor={credencial}
+                    onCambio={setCredencial}
+                    autoComplete="new-password"
+                    ayuda="Al menos 10 caracteres, con letras y números."
+                    maxLength={128}
+                    error={errCredencial}
+                  />
+                  <CampoTexto id="confirmacion" etiqueta="Repite la contraseña" tipo="password" valor={confirmacion} onCambio={setConfirmacion} autoComplete="new-password" maxLength={128} error={errConfirmacion} />
+                </>
+              )}
               <CampoTexto id="telefono" etiqueta="Teléfono" tipo="tel" valor={telefono} onCambio={setTelefono} autoComplete="tel" opcional inputMode="tel" error={errTelefono} />
               <div>
                 <p className="text-sm font-bold text-vino-800">
@@ -256,27 +291,27 @@ export function CrearCuenta() {
               <div>
                 <Etiqueta>Paso 4 de 4</Etiqueta>
                 <h1 id="cuenta4" className="mt-4 text-2xl font-bold tracking-tight text-vino-800">
-                  Revisa antes de crear la cuenta
+                  {completar ? 'Revisa antes de completar tu registro' : 'Revisa antes de crear la cuenta'}
                 </h1>
               </div>
               <dl className="divide-y divide-vino-100 rounded-tarjeta border border-vino-100 bg-white">
                 <FilaResumen etiqueta="Nombre" valor={nombre} />
                 <FilaResumen etiqueta="Documento" valor={'•'.repeat(Math.max(documento.length - 3, 0)) + documento.slice(-3)} />
                 <FilaResumen etiqueta="Fecha de nacimiento" valor={fecha(nacimiento)} />
-                <FilaResumen etiqueta="Correo" valor={correo} />
+                <FilaResumen etiqueta="Correo" valor={completar ? (usuario?.correo ?? '') : correo} />
                 <FilaResumen etiqueta="Teléfono" valor={telefono || 'Sin indicar'} />
                 <FilaResumen etiqueta="Municipio" valor={municipio ? nombreCompletoMunicipio(municipio.split('/').pop()!) : 'Sin indicar'} />
                 <FilaResumen etiqueta="Tratamiento de datos" valor="Autorizado" />
                 <FilaResumen etiqueta="Avisos de jornadas" valor={aceptaAvisos ? 'Autorizados' : 'No autorizados'} />
               </dl>
-              {registro.error && <MensajeError>{mensajeRegistro(registro.error)}</MensajeError>}
+              {registro.error && <MensajeError>{mensajeRegistro(registro.error, cuentaLista)}</MensajeError>}
               {errorEntrada && (
                 <Aviso tono="exito" titulo="Tu cuenta quedó creada">
                   No pudimos iniciar tu sesión automáticamente.{' '}
                   <Link to="/ingresar" className="font-bold underline underline-offset-4">
                     Inicia sesión
                   </Link>{' '}
-                  con tu correo y tu contraseña.
+                  con tu correo y tu contraseña para terminar tu registro.
                 </Aviso>
               )}
               <div className="flex flex-wrap gap-3">
@@ -284,7 +319,7 @@ export function CrearCuenta() {
                   Atrás
                 </Boton>
                 <Boton conFlecha onClick={crear} cargando={registro.enCurso} deshabilitado={errorEntrada}>
-                  Crear mi cuenta
+                  {completar ? 'Completar mi registro' : 'Crear mi cuenta'}
                 </Boton>
               </div>
             </section>
@@ -292,7 +327,7 @@ export function CrearCuenta() {
         </div>
       </Tarjeta>
 
-      {paso === 1 && (
+      {paso === 1 && !completar && (
         <div className="grid gap-3 sm:grid-cols-3">
           {VENTAJAS.map((v) => (
             <div key={v.titulo} className="rounded-tarjeta border border-vino-100/80 bg-white p-4 shadow-nivel-1">
@@ -306,18 +341,31 @@ export function CrearCuenta() {
         </div>
       )}
 
-      <p className="text-center text-sm text-texto-gris">
-        ¿Ya tienes cuenta?{' '}
-        <Link to="/ingresar" className="font-bold text-vino-700 underline-offset-4 hover:underline">
-          Inicia sesión
-        </Link>
-      </p>
+      {!completar && (
+        <p className="text-center text-sm text-texto-gris">
+          ¿Ya tienes cuenta?{' '}
+          <Link to="/ingresar" className="font-bold text-vino-700 underline-offset-4 hover:underline">
+            Inicia sesión
+          </Link>
+        </p>
+      )}
     </div>
   )
 }
 
-function mensajeRegistro(error: ErrorApi): string {
+/** M1-U2-01 para quien ya tiene cuenta pero no perfil: el registro se interrumpió. */
+export function CompletarRegistro() {
+  return <CrearCuenta completar />
+}
+
+/** `enPerfil`: el fallo fue al crear el perfil, con la cuenta ya creada y la sesión iniciada. */
+function mensajeRegistro(error: ErrorApi, enPerfil: boolean): string {
+  if (error.tipo === 'menor-de-edad') return error.detalle
+  if (error.estado === 409 && enPerfil) {
+    return 'No es posible crear el perfil con estos datos. Si tu documento ya está registrado con otra cuenta, entra con esa cuenta.'
+  }
   if (error.estado === 409) return 'No es posible crear la cuenta con estos datos. Si ya tienes una cuenta, inicia sesión.'
+  if (error.estado === 422 && error.tipo === 'consentimiento-requerido') return 'Para crear la cuenta debes autorizar el tratamiento de tus datos.'
   if (error.estado === 400) return 'Revisa los datos: alguno no tiene el formato esperado.'
   if (error.estado === 429) return 'Hiciste demasiados intentos seguidos. Espera un minuto antes de volver a intentarlo.'
   if (error.estado === 503) return 'No fue posible crear la cuenta en este momento. Inténtalo de nuevo en unos minutos.'

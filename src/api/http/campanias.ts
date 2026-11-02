@@ -1,4 +1,4 @@
-import type { Campania, EstadoCampania } from '@/shared/tipos'
+import type { Campania, DatosCampania, EstadoCampania } from '@/shared/tipos'
 import type { ServicioCampanias } from '../contratos'
 import type { ClienteHttp } from './cliente'
 
@@ -7,6 +7,7 @@ import type { ClienteHttp } from './cliente'
 interface CampaniaRespuesta {
   id: string
   institucion_id: string
+  institucion_nombre: string | null
   territorio_codigo: string
   territorio_ruta: string
   nombre: string
@@ -23,6 +24,7 @@ interface CampaniaRespuesta {
 const aCampania = (c: CampaniaRespuesta): Campania => ({
   id: c.id,
   institucionId: c.institucion_id,
+  institucionNombre: c.institucion_nombre ?? null,
   nombre: c.nombre,
   descripcion: c.descripcion,
   sede: c.sede,
@@ -36,6 +38,15 @@ const aCampania = (c: CampaniaRespuesta): Campania => ({
   donacionesRegistradas: c.donaciones_registradas ?? null,
 })
 
+const aCuerpo = (d: Partial<DatosCampania>) => ({
+  nombre: d.nombre,
+  descripcion: d.descripcion,
+  sede: d.sede,
+  inicia_en: d.iniciaEn,
+  termina_en: d.terminaEn,
+  cupo_total: d.cupoTotal,
+})
+
 export function crearCampaniasHttp(cliente: ClienteHttp): ServicioCampanias {
   return {
     async listar(filtro) {
@@ -43,6 +54,12 @@ export function crearCampaniasHttp(cliente: ClienteHttp): ServicioCampanias {
         consulta: { territorio: filtro?.territorioRuta },
       })
       return r.map(aCampania)
+    },
+    async crear(datos) {
+      return aCampania(await cliente.solicitar<CampaniaRespuesta>('POST', '/v1/campanias', { cuerpo: aCuerpo(datos) }))
+    },
+    async editar(id, cambio) {
+      return aCampania(await cliente.solicitar<CampaniaRespuesta>('PUT', `/v1/campanias/${id}`, { cuerpo: aCuerpo(cambio) }))
     },
     async publicar(id) {
       return aCampania(await cliente.solicitar<CampaniaRespuesta>('POST', `/v1/campanias/${id}/publicacion`))

@@ -54,6 +54,15 @@ export function crearIdentidadHttp(cliente: ClienteHttp): ServicioIdentidad {
       await cliente.solicitar<void>('DELETE', '/v1/sesiones/actual')
     },
 
+    async crearCuentaDonante(cuenta, claveIdempotencia) {
+      const r = await cliente.solicitar<{ usuario_id: string }>('POST', '/v1/cuentas-donante', {
+        cuerpo: { correo: cuenta.correo, credencial: cuenta.credencial, nombre: cuenta.nombre },
+        claveIdempotencia,
+        sinSesion: true,
+      })
+      return r.usuario_id
+    },
+
     async obtenerUsuarioActual() {
       const r = await cliente.solicitar<UsuarioRespuesta>('GET', '/v1/usuarios/me')
       const rol = rolDesdeCodigo(r.rol)
@@ -64,9 +73,9 @@ export function crearIdentidadHttp(cliente: ClienteHttp): ServicioIdentidad {
 }
 
 /**
- * Sin Servicio Institucional todavia no hay nombre de banco que mostrar: la
- * jurisdiccion institucional se declara como «tu banco de sangre», y la
- * territorial con el nombre DIVIPOLA del territorio.
+ * La jurisdiccion institucional se declara como «tu banco de sangre» (la barra
+ * de contexto muestra ademas su nombre, que resuelve el Servicio
+ * Institucional), y la territorial con el nombre DIVIPOLA del territorio.
  */
 function jurisdiccion(ambito: AmbitoRespuesta | undefined, rol: RolId): Jurisdiccion {
   if (!ambito) {

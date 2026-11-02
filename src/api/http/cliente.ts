@@ -11,7 +11,9 @@ import { gestorSesion } from '../gestorSesion'
  *    propaga, y aparece en los errores para poder rastrearlos (T-305.5).
  *  - Las operaciones marcadas `idempotente` llevan `Idempotency-Key`. La
  *    clave se fija antes del primer intento, de modo que el reintento tras
- *    renovar la sesion es la misma operacion y no una segunda.
+ *    renovar la sesion es la misma operacion y no una segunda. Quien reintenta
+ *    la misma operacion a mano (un formulario que se vuelve a enviar) pasa su
+ *    propia clave en `claveIdempotencia`.
  *  - La cookie de renovacion es HttpOnly: el navegador la envia sola a
  *    /api/v1/sesiones porque la peticion es del mismo origen.
  */
@@ -22,6 +24,8 @@ export interface OpcionesSolicitud {
   cuerpo?: unknown
   consulta?: Record<string, string | undefined>
   idempotente?: boolean
+  /** Clave fija para una operacion que la pantalla puede reenviar. Implica `idempotente`. */
+  claveIdempotencia?: string
   /** Operacion de sesion: no lleva token ni se reintenta tras renovar. */
   sinSesion?: boolean
 }
@@ -79,7 +83,7 @@ export function crearClienteHttp(base: string): ClienteHttp {
 
   return {
     solicitar<T>(metodo: Metodo, ruta: string, opciones: OpcionesSolicitud = {}) {
-      const clave = opciones.idempotente ? nuevoId() : null
+      const clave = opciones.claveIdempotencia ?? (opciones.idempotente ? nuevoId() : null)
       if (opciones.sinSesion) return enviar<T>(metodo, ruta, opciones, null, clave)
       return gestorSesion.conSesion((token) => enviar<T>(metodo, ruta, opciones, token, clave))
     },

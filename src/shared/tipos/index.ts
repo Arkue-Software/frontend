@@ -93,12 +93,18 @@ export interface NuevaIntencion {
   municipioRuta: string | null
 }
 
+/** La cuenta en Identidad: el correo y la contraseña con que se entra. */
+export interface CuentaDonanteNueva {
+  correo: string
+  credencial: string
+  nombre: string
+}
+
+/** El perfil en Donación, que se crea con la sesión de la cuenta. */
 export interface RegistroDonante {
   documento: string
   nombre: string
   fechaNacimiento: string
-  correoAcceso: string
-  credencial: string
   correoContacto: string | null
   telefono: string | null
   municipioRuta: string | null
@@ -132,7 +138,11 @@ export interface CambioPerfil {
 export interface DonacionPropia {
   id: string
   fecha: string
+  institucionId: string
+  /** Nulo mientras Donación no tenga la institución en su copia local. */
+  institucionNombre: string | null
   campaniaId: string | null
+  campaniaNombre: string | null
   /** Mensaje neutro, identico para todo donante. */
   mensaje: string
 }
@@ -169,6 +179,8 @@ export type EstadoCampania = 'borrador' | 'publicada' | 'cerrada' | 'cancelada'
 export interface Campania {
   id: string
   institucionId: string
+  /** Nulo mientras Campañas no tenga la institución en su copia local. */
+  institucionNombre: string | null
   nombre: string
   descripcion: string | null
   sede: string
@@ -182,6 +194,16 @@ export interface Campania {
   cupoDisponible: number | null
   /** Solo para roles institucionales (RF-25). */
   donacionesRegistradas: number | null
+}
+
+/** Datos de una campaña nueva o de la edición de un borrador (DD 15.3). */
+export interface DatosCampania {
+  nombre: string
+  descripcion: string | null
+  sede: string
+  iniciaEn: string
+  terminaEn: string
+  cupoTotal: number | null
 }
 
 /* ----------------------------------------- M3 — Trazabilidad y ciclo de vida */
@@ -270,6 +292,7 @@ export interface Transicion {
 /* ------------------------------------------------- M4 — Inventario y alertas */
 
 export interface Existencia {
+  institucionId: string
   componente: ComponenteSanguineo
   grupo: GrupoSanguineo
   disponibles: number
@@ -289,6 +312,7 @@ export type EstadoAlerta = 'abierta' | 'atendida' | 'caducada'
 
 export interface Alerta {
   id: string
+  institucionId: string
   tipo: TipoAlerta
   componente: ComponenteSanguineo
   grupo: GrupoSanguineo | null
@@ -299,4 +323,150 @@ export interface Alerta {
   estado: EstadoAlerta
   generadaEn: string
   cerradaEn: string | null
+}
+
+/* ------------------------------- M6 — Red institucional y territorial */
+
+export type NivelTerritorial = 'nacional' | 'departamental' | 'municipal'
+
+/** Territorio registrado en el Servicio Institucional (DD Sección 7). */
+export interface TerritorioRegistrado {
+  id: string
+  codigoDivipola: string
+  nombre: string
+  nivel: NivelTerritorial
+  padreId: string | null
+  ruta: string
+  vigente: boolean
+}
+
+export type TipoInstitucion = 'banco_de_sangre' | 'servicio_transfusion'
+
+export interface Institucion {
+  id: string
+  codigo: string
+  nombre: string
+  tipo: TipoInstitucion
+  territorioId: string
+  territorioCodigo: string
+  territorioRuta: string
+  territorioNombre: string
+  direccion: string | null
+  vigente: boolean
+  creadoEn: string
+}
+
+export interface FiltroInstituciones {
+  territorioRuta?: string
+  tipo?: TipoInstitucion
+  incluirBajas?: boolean
+  pagina?: number
+  tamano?: number
+}
+
+export interface NuevaInstitucion {
+  codigo: string
+  nombre: string
+  tipo: TipoInstitucion
+  territorioId: string
+  direccion: string | null
+}
+
+export interface CambioInstitucion {
+  nombre?: string
+  direccion?: string
+  vigente?: boolean
+}
+
+/* ------------------------------------------- M7 — Analítica e indicadores */
+
+export type AgrupacionIndicadores = 'dia' | 'semana' | 'mes'
+
+export interface PeriodoCaptacion {
+  periodo: string
+  donaciones: number
+  unidadesGeneradas: number
+  /** Nulo cuando el periodo tiene menos de cinco donaciones (supresión por agregación). */
+  unidadesNoAptas: number | null
+  unidadesVencidas: number
+  suprimidoPorAgregacion: boolean
+}
+
+export interface ExistenciaAgregada {
+  institucionId: string
+  componente: ComponenteSanguineo
+  grupo: GrupoSanguineo
+  disponibles: number
+  porVencer: number
+  bajoUmbral: boolean
+}
+
+export interface CoberturaDepartamento {
+  territorioCodigo: string
+  nombre: string
+  ruta: string
+  municipios: number
+  municipiosConBanco: number
+  bancosDeSangre: number
+  serviciosTransfusion: number
+}
+
+export interface FiltroIndicadores {
+  desde?: string
+  hasta?: string
+  agruparPor?: AgrupacionIndicadores
+  institucionId?: string
+  territorioRuta?: string
+}
+
+export interface Indicadores {
+  filtro: { desde: string; hasta: string; agruparPor: AgrupacionIndicadores; institucionId: string | null; territorioRuta: string | null }
+  /** Momento de la fotografía más antigua que Donación envió de lo medido; nulo si todavía no llega ninguna. */
+  actualizadoEn: string | null
+  captacion: PeriodoCaptacion[]
+  inventario: ExistenciaAgregada[]
+  cobertura: CoberturaDepartamento[]
+}
+
+/* --------------------------------------------------- ST2 — Bitácora */
+
+export type ContextoBitacora = 'identidad' | 'campanias' | 'donacion' | 'institucional'
+
+export interface RegistroBitacora {
+  contexto: ContextoBitacora
+  id: string
+  actorTipo: 'usuario' | 'sistema' | 'anonimo'
+  actorId: string | null
+  rol: string | null
+  jurisdiccionSolicitada: string | null
+  operacion: string
+  recursoTipo: string
+  recursoId: string | null
+  resultado: 'permitido' | 'denegado'
+  correlacionId: string
+  origen: string | null
+  ocurridoEn: string
+}
+
+export interface FiltroBitacora {
+  recursoTipo?: string
+  recursoId?: string
+  correlacionId?: string
+  actorId?: string
+  desde?: string
+  hasta?: string
+  tamano?: number
+  antesDe?: string
+}
+
+export interface Bitacora {
+  registros: RegistroBitacora[]
+  /** Cursor de la página siguiente; nulo si no hay más. */
+  siguiente: string | null
+  /**
+   * Hasta cuándo está al día cada serie: la propia, siempre; la de otro
+   * contexto, hasta el último registro que llegó de él por Kafka. Nulo si
+   * todavía no ha llegado ninguno.
+   */
+  series: { contexto: ContextoBitacora; alDiaHasta: string | null }[]
 }

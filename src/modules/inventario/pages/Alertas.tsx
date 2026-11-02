@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAccion, useConsulta } from '@/shared/consulta/useConsulta'
 import { EstadoDeConsulta } from '@/shared/consulta/EstadoDeConsulta'
+import { useRecargaPeriodica } from '@/shared/consulta/useRecargaPeriodica'
 import { ETIQUETA_COMPONENTE, ETIQUETA_ESTADO_ALERTA, ETIQUETA_TIPO_ALERTA } from '@/shared/datos/catalogos'
 import { fechaHora, idCorto } from '@/shared/formato'
+import { NombreInstitucion } from '@/shared/institucional/NombreInstitucion'
 import { useSesion } from '@/shared/sesion/SesionContexto'
 import { DialogoConfirmacion } from '@/shared/ui/DialogoConfirmacion'
 import { Boton, EstadoVacio, Tarjeta, TituloSeccion, unir } from '@/shared/ui/Primitivos'
@@ -14,9 +16,12 @@ import type { Alerta } from '@/shared/tipos'
 /**
  * M4-U3-02 / M4-U4-03 — Alertas de inventario (GET /v1/alertas).
  * M4-U4-04 — Atender una alerta (POST /v1/alertas/{id}/atencion), solo U4.
+ * M4-U5-02 — Alertas de los bancos de la jurisdicción, en lectura.
  *
- * Las alertas las genera un proceso programado de Donación a partir de los
- * umbrales. Una alerta se cierra sola cuando su condición desaparece.
+ * Las alertas las genera Donación a partir de los umbrales, en la misma
+ * operación que cambia una unidad o un umbral, y un proceso programado revisa
+ * además los vencimientos. Una alerta se cierra sola cuando su condición
+ * desaparece. La lista se vuelve a pedir sola mientras se mira.
  */
 export function Alertas() {
   useTituloPagina('Alertas')
@@ -25,6 +30,7 @@ export function Alertas() {
   const [parametros, setParametros] = useSearchParams()
   const soloAbiertas = parametros.get('todas') !== '1'
   const consulta = useConsulta((api) => api.inventario.listarAlertas(soloAbiertas ? 'abierta' : undefined), [soloAbiertas])
+  useRecargaPeriodica(consulta.recargar)
   const [porAtender, setPorAtender] = useState<Alerta | null>(null)
 
   return (
@@ -65,7 +71,7 @@ export function Alertas() {
                 .sort((a, b) => b.generadaEn.localeCompare(a.generadaEn))
                 .map((a) => (
                   <li key={a.id}>
-                    <TarjetaAlerta alerta={a} atiende={atiende} onAtender={() => setPorAtender(a)} />
+                    <TarjetaAlerta alerta={a} atiende={atiende} conBanco={usuario?.rol === 'U5'} onAtender={() => setPorAtender(a)} />
                   </li>
                 ))}
             </ul>
@@ -87,7 +93,17 @@ export function Alertas() {
   )
 }
 
-function TarjetaAlerta({ alerta: a, atiende, onAtender }: { alerta: Alerta; atiende: boolean; onAtender: () => void }) {
+function TarjetaAlerta({
+  alerta: a,
+  atiende,
+  conBanco,
+  onAtender,
+}: {
+  alerta: Alerta
+  atiende: boolean
+  conBanco: boolean
+  onAtender: () => void
+}) {
   const abierta = a.estado === 'abierta'
   return (
     <Tarjeta className={unir(!abierta && 'opacity-75')}>
@@ -107,6 +123,11 @@ function TarjetaAlerta({ alerta: a, atiende, onAtender }: { alerta: Alerta; atie
               {ETIQUETA_TIPO_ALERTA[a.tipo]}: {ETIQUETA_COMPONENTE[a.componente]}
               {a.grupo && ` ${a.grupo}`}
             </p>
+            {conBanco && (
+              <p className="mt-0.5 text-xs text-texto-tenue">
+                <NombreInstitucion id={a.institucionId} />
+              </p>
+            )}
             <p className="mt-1 text-sm text-texto-gris">{detalle(a)}</p>
             <p className="mt-1 text-xs text-texto-tenue">
               Generada el {fechaHora(a.generadaEn)} · {ETIQUETA_ESTADO_ALERTA[a.estado]}

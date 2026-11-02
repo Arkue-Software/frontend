@@ -6,6 +6,7 @@ import { useAccion, useConsulta } from '@/shared/consulta/useConsulta'
 import { EstadoDeConsulta } from '@/shared/consulta/EstadoDeConsulta'
 import { ETIQUETA_COMPONENTE, ETIQUETA_OBSERVACION, tituloEventoUnidad } from '@/shared/datos/catalogos'
 import { fecha, fechaHora, idCorto } from '@/shared/formato'
+import { NombreInstitucion } from '@/shared/institucional/NombreInstitucion'
 import { useSesion } from '@/shared/sesion/SesionContexto'
 import { DialogoConfirmacion } from '@/shared/ui/DialogoConfirmacion'
 import { InsigniaEstadoUnidad } from '@/shared/ui/EstadoUnidad'
@@ -17,6 +18,7 @@ import type { EventoUnidad, Unidad } from '@/shared/tipos'
 /**
  * M3-U3-04 — Detalle de la unidad y su recorrido (GET /v1/unidades/{id} y /eventos).
  * M3-U3-05 a 09 — Acciones del operador según el estado (DD V3.0, sección 10).
+ * U4, U5, U6 y U7 leen la trazabilidad dentro de su alcance, sin acciones.
  *
  * Solo se ofrecen las transiciones que la matriz permite desde el estado
  * actual: la interfaz no deja intentar lo que el servicio rechazaría. El
@@ -41,6 +43,9 @@ type Accion =
 export function DetalleUnidad() {
   const { id = '' } = useParams()
   useTituloPagina(`Unidad ${idCorto(id)}`)
+  const { usuario } = useSesion()
+  // El auditor llega a la trazabilidad desde la bitácora: no tiene listado de unidades.
+  const volver = usuario?.rol === 'U7' ? { ruta: '/auditoria', texto: '← Bitácora' } : { ruta: '/ciclovida/unidades', texto: '← Unidades' }
   const consulta = useConsulta(
     async (api): Promise<DatosUnidad> => {
       const [unidad, eventos] = await Promise.all([api.trazabilidad.obtenerUnidad(id), api.trazabilidad.listarEventosUnidad(id)])
@@ -51,10 +56,17 @@ export function DetalleUnidad() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <Link to="/ciclovida/unidades" className="text-sm font-bold text-vino-700 underline-offset-4 hover:underline">
-        ← Unidades
+      <Link to={volver.ruta} className="text-sm font-bold text-vino-700 underline-offset-4 hover:underline">
+        {volver.texto}
       </Link>
-      <EstadoDeConsulta consulta={consulta} noEncontrado="La unidad no existe o no está bajo custodia de tu banco.">
+      <EstadoDeConsulta
+        consulta={consulta}
+        noEncontrado={
+          usuario?.rol === 'U3' || usuario?.rol === 'U4'
+            ? 'La unidad no existe o no está bajo custodia de tu banco.'
+            : 'La unidad no existe o no está dentro de tu jurisdicción.'
+        }
+      >
         {(datos) => <Contenido datos={datos} onCambio={consulta.recargar} />}
       </EstadoDeConsulta>
     </div>
@@ -77,6 +89,11 @@ function Contenido({ datos, onCambio }: { datos: DatosUnidad; onCambio: () => vo
       </TituloSeccion>
       <p className="-mt-4 break-all font-mono text-xs text-texto-tenue">{unidad.id}</p>
 
+      {!(usuario?.rol === 'U3' || usuario?.rol === 'U4') && (
+        <p className="-mt-3 text-sm text-texto-gris">
+          Bajo custodia de <NombreInstitucion id={unidad.institucionCustodiaId} />
+        </p>
+      )}
       <div className="grid gap-4 sm:grid-cols-4">
         <Dato etiqueta="Grupo" valor={unidad.grupo} />
         <Dato etiqueta="Captación" valor={<span className="text-lg">{fecha(unidad.fechaCaptacion)}</span>} />

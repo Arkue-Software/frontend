@@ -262,3 +262,14 @@ export function IconoInformacion(props: PropsIcono) {
     </Base>
   )
 }
+
+export function IconoGrafica(props: PropsIcono) {
+  return (
+    <Base {...props}>
+      <path d="M4 20.5h16" />
+      <rect x="5.5" y="12" width="3" height="6" rx="0.8" />
+      <rect x="10.5" y="7.5" width="3" height="10.5" rx="0.8" />
+      <rect x="15.5" y="10" width="3" height="8" rx="0.8" />
+    </Base>
+  )
+}

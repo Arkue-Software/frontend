@@ -13,6 +13,7 @@ interface UmbralRespuesta {
 
 interface AlertaRespuesta {
   id: string
+  institucion_id: string
   tipo: TipoAlerta
   componente: ComponenteSanguineo
   grupo_sanguineo: GrupoSanguineo | null
@@ -32,6 +33,7 @@ const aUmbral = (u: UmbralRespuesta): Umbral => ({
 
 const aAlerta = (a: AlertaRespuesta): Alerta => ({
   id: a.id,
+  institucionId: a.institucion_id,
   tipo: a.tipo,
   componente: a.componente,
   grupo: a.grupo_sanguineo,
@@ -47,6 +49,7 @@ export function crearInventarioHttp(cliente: ClienteHttp): ServicioInventario {
     async consultarExistencias() {
       const r = await cliente.solicitar<
         {
+          institucion_id: string
           componente: ComponenteSanguineo
           grupo_sanguineo: GrupoSanguineo
           unidades_disponibles: number
@@ -54,6 +57,7 @@ export function crearInventarioHttp(cliente: ClienteHttp): ServicioInventario {
         }[]
       >('GET', '/v1/inventario')
       return r.map((e) => ({
+        institucionId: e.institucion_id,
         componente: e.componente,
         grupo: e.grupo_sanguineo,
         disponibles: e.unidades_disponibles,

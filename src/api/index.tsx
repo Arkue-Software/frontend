@@ -7,6 +7,7 @@ import { crearCampaniasHttp } from './http/campanias'
 import { crearClienteHttp } from './http/cliente'
 import { crearDonantesHttp } from './http/donantes'
 import { crearIdentidadHttp } from './http/identidad'
+import { crearInstitucionalHttp } from './http/institucional'
 import { crearInventarioHttp } from './http/inventario'
 import { crearTrazabilidadHttp } from './http/trazabilidad'
 
@@ -24,6 +25,7 @@ export function crearApi(): Api {
     campanias: crearCampaniasHttp(cliente),
     trazabilidad: crearTrazabilidadHttp(cliente),
     inventario: crearInventarioHttp(cliente),
+    institucional: crearInstitucionalHttp(cliente),
   }
 }
 

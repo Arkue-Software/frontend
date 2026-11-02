@@ -88,14 +88,12 @@ export function crearDonantesHttp(cliente: ClienteHttp): ServicioDonantes {
       }
     },
 
-    async registrarDonante(d) {
+    async registrarDonante(d, claveIdempotencia) {
       await cliente.solicitar<void>('POST', '/v1/donantes', {
         cuerpo: {
           documento: d.documento,
           nombre: d.nombre,
           fecha_nacimiento: d.fechaNacimiento,
-          correo_acceso: d.correoAcceso,
-          credencial: d.credencial,
           correo: d.correoContacto,
           telefono: d.telefono,
           municipio_ruta: d.municipioRuta,
@@ -103,8 +101,7 @@ export function crearDonantesHttp(cliente: ClienteHttp): ServicioDonantes {
           autoriza_avisos_campanas: d.autorizaAvisos,
           version_aviso: d.versionAviso,
         },
-        idempotente: true,
-        sinSesion: true,
+        claveIdempotencia,
       })
     },
 
@@ -126,9 +123,25 @@ export function crearDonantesHttp(cliente: ClienteHttp): ServicioDonantes {
 
     async listarMisDonaciones() {
       const r = await cliente.solicitar<
-        { id: string; fecha_captacion: string; campania_id: string | null; mensaje: string }[]
+        {
+          id: string
+          fecha_captacion: string
+          institucion_id: string
+          institucion_nombre: string | null
+          campania_id: string | null
+          campania_nombre: string | null
+          mensaje: string
+        }[]
       >('GET', '/v1/donantes/me/donaciones')
-      return r.map((d) => ({ id: d.id, fecha: d.fecha_captacion, campaniaId: d.campania_id, mensaje: d.mensaje }))
+      return r.map((d) => ({
+        id: d.id,
+        fecha: d.fecha_captacion,
+        institucionId: d.institucion_id,
+        institucionNombre: d.institucion_nombre,
+        campaniaId: d.campania_id,
+        campaniaNombre: d.campania_nombre,
+        mensaje: d.mensaje,
+      }))
     },
 
     async listarReconocimientos() {

@@ -9,10 +9,10 @@ import { CargandoRedVital } from '@/shared/ui/Cargando'
 import type { RolId } from '@/shared/tipos'
 
 /**
- * Rutas de la aplicación. Cada perfil ve solo los módulos con servicio
- * desplegado (matriz del SRS V4.0 recortada por el alcance vigente): M1, M3 y
- * M4 en Donación, M2 en Campañas. Transferencias, bitácora, red territorial y
- * analítica esperan al Servicio Institucional.
+ * Rutas de la aplicación, por perfil según la matriz normativa del DD V3.0
+ * (sección 15.5): M1, M3 y M4 en Donación, M2 en Campañas, M6, M7 y la
+ * bitácora en el Servicio Institucional. Transferencias y convocatorias (M5)
+ * no forman parte de esta versión.
  *
  * Cada módulo se carga por separado: el donante que entra a registrarse no
  * descarga el código del inventario.
@@ -20,7 +20,6 @@ import type { RolId } from '@/shared/tipos'
 
 // Transversal
 const InicioSesion = pagina(() => import('@/shared/paginas/InicioSesion'), 'InicioSesion')
-const SinModulos = pagina(() => import('@/shared/paginas/SinModulos'), 'SinModulos')
 const Denegacion = pagina(() => import('@/shared/paginas/Denegacion'), 'Denegacion')
 const NoEncontrado = pagina(() => import('@/shared/paginas/NoEncontrado'), 'NoEncontrado')
 
@@ -29,6 +28,7 @@ const Bienvenida = pagina(() => import('@/modules/donantes/pages/Bienvenida'), '
 const RegistroAnonimo = pagina(() => import('@/modules/donantes/pages/RegistroAnonimo'), 'RegistroAnonimo')
 const ConsultaRegistro = pagina(() => import('@/modules/donantes/pages/ConsultaRegistro'), 'ConsultaRegistro')
 const CrearCuenta = pagina(() => import('@/modules/donantes/pages/CrearCuenta'), 'CrearCuenta')
+const CompletarRegistro = pagina(() => import('@/modules/donantes/pages/CrearCuenta'), 'CompletarRegistro')
 const MiPerfil = pagina(() => import('@/modules/donantes/pages/MiPerfil'), 'MiPerfil')
 const MiHistorial = pagina(() => import('@/modules/donantes/pages/MiHistorial'), 'MiHistorial')
 const MisReconocimientos = pagina(() => import('@/modules/donantes/pages/MisReconocimientos'), 'MisReconocimientos')
@@ -42,6 +42,12 @@ const CampaniasJurisdiccion = pagina(() => import('@/modules/campanas/pages/Camp
 const RegistroDonacion = pagina(() => import('@/modules/ciclovida/pages/RegistroDonacion'), 'RegistroDonacion')
 const ListaUnidades = pagina(() => import('@/modules/ciclovida/pages/ListaUnidades'), 'ListaUnidades')
 const DetalleUnidad = pagina(() => import('@/modules/ciclovida/pages/DetalleUnidad'), 'DetalleUnidad')
+
+// M6, M7 y bitácora — Servicio Institucional
+const Territorios = pagina(() => import('@/modules/institucional/pages/Territorios'), 'Territorios')
+const Instituciones = pagina(() => import('@/modules/institucional/pages/Instituciones'), 'Instituciones')
+const Indicadores = pagina(() => import('@/modules/institucional/pages/Indicadores'), 'Indicadores')
+const Bitacora = pagina(() => import('@/modules/institucional/pages/Bitacora'), 'Bitacora')
 
 // M4 — Inventario y alertas
 const PanelInventario = pagina(() => import('@/modules/inventario/pages/PanelInventario'), 'PanelInventario')
@@ -62,24 +68,30 @@ export function App() {
 
         {/* M1 — Donante con cuenta (U2) */}
         <Route path="donantes/perfil" element={<Protegida roles={['U2']}><MiPerfil /></Protegida>} />
+        <Route path="donantes/completar" element={<Protegida roles={['U2']}><CompletarRegistro /></Protegida>} />
         <Route path="donantes/historial" element={<Protegida roles={['U2']}><MiHistorial /></Protegida>} />
         <Route path="donantes/reconocimientos" element={<Protegida roles={['U2']}><MisReconocimientos /></Protegida>} />
         <Route path="donantes/consulta" element={<Protegida roles={['U3']}><ConsultaDonante /></Protegida>} />
 
         {/* M3 */}
         <Route path="ciclovida/registro-donacion" element={<Protegida roles={['U3']}><RegistroDonacion /></Protegida>} />
-        <Route path="ciclovida/unidades" element={<Protegida roles={['U3', 'U4']}><ListaUnidades /></Protegida>} />
-        <Route path="ciclovida/unidades/:id" element={<Protegida roles={['U3', 'U4']}><DetalleUnidad /></Protegida>} />
+        <Route path="ciclovida/unidades" element={<Protegida roles={['U3', 'U4', 'U5', 'U6']}><ListaUnidades /></Protegida>} />
+        <Route path="ciclovida/unidades/:id" element={<Protegida roles={['U3', 'U4', 'U5', 'U6', 'U7']}><DetalleUnidad /></Protegida>} />
 
         {/* M4 */}
-        <Route path="inventario" element={<Protegida roles={['U3', 'U4']}><PanelInventario /></Protegida>} />
-        <Route path="inventario/alertas" element={<Protegida roles={['U3', 'U4']}><Alertas /></Protegida>} />
+        <Route path="inventario" element={<Protegida roles={['U3', 'U4', 'U5', 'U6']}><PanelInventario /></Protegida>} />
+        <Route path="inventario/alertas" element={<Protegida roles={['U3', 'U4', 'U5']}><Alertas /></Protegida>} />
 
         {/* M2 institucional */}
         <Route path="campanias" element={<Protegida roles={['U3', 'U4', 'U5', 'U6']}><CampaniasJurisdiccion /></Protegida>} />
 
+        {/* M6, M7 y bitácora */}
+        <Route path="territorios" element={<Protegida roles={['U4', 'U5', 'U6', 'U7']}><Territorios /></Protegida>} />
+        <Route path="instituciones" element={<Protegida roles={['U4', 'U5', 'U6', 'U7']}><Instituciones /></Protegida>} />
+        <Route path="indicadores" element={<Protegida roles={['U4', 'U5', 'U6']}><Indicadores /></Protegida>} />
+        <Route path="auditoria" element={<Protegida roles={['U7']}><Bitacora /></Protegida>} />
+
         {/* Transversal */}
-        <Route path="sin-modulos" element={<Protegida roles={['U7']}><SinModulos /></Protegida>} />
         <Route path="denegado" element={<Carga><Denegacion /></Carga>} />
         <Route path="*" element={<Carga><NoEncontrado /></Carga>} />
       </Route>

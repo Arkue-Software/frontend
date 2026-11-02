@@ -21,11 +21,12 @@ Como la cookie es `Secure`, la aplicación se sirve por HTTPS (en QA, Caddy con 
 | U1 visitante | Portada, registro anónimo en 3 pasos, consulta por código, jornadas, crear cuenta, iniciar sesión |
 | U2 donante | Mi perfil (elegibilidad, contacto, autorizaciones), historial, reconocimientos, jornadas |
 | U3 operador | Consultar donante, registrar donación y fraccionamiento, unidades y su detalle con las acciones de los 9 estados, inventario y alertas (lectura), campañas |
-| U4 administrador de banco | Inventario y umbrales, alertas (atender), unidades (lectura), campañas del banco (publicar y cerrar) |
-| U5 / U6 | Campañas de su jurisdicción, en lectura |
-| U7 auditor | Aviso de que aún no hay módulos para su perfil |
+| U4 administrador de banco | Inventario y umbrales, alertas (atender), unidades (lectura), campañas del banco (crear, editar, publicar y cerrar), indicadores, su institución y su municipio |
+| U5 coordinador | Indicadores, unidades, inventario, alertas y campañas de su territorio en lectura; instituciones de su territorio (alta, cambio y baja); territorios |
+| U6 administrador nacional | Indicadores, unidades, inventario y campañas nacionales en lectura; territorios (alta) e instituciones (alta, cambio y baja) |
+| U7 auditor | Bitácora de los cuatro contextos, trazabilidad de una unidad, territorios e instituciones, todo en lectura |
 
-Transferencias, bitácora, red territorial y analítica dependen del Servicio Institucional y no se ofrecen todavía: una entrada que un perfil no puede usar no se dibuja.
+Transferencias y convocatorias no forman parte de esta versión: una entrada que un perfil no puede usar no se dibuja.
 
 ## Desarrollo
 
