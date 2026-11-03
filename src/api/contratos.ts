@@ -1,23 +1,35 @@
 import type {
   Alerta,
+  Bitacora,
+  CambioInstitucion,
   CambioPerfil,
   Campania,
   Consentimiento,
+  CuentaDonanteNueva,
+  DatosCampania,
   Donacion,
   DonacionPropia,
   DonantePresente,
   Elegibilidad,
   EventoUnidad,
   Existencia,
+  FiltroBitacora,
+  FiltroIndicadores,
+  FiltroInstituciones,
   FiltroUnidades,
   FinalidadConsentimiento,
+  Indicadores,
+  Institucion,
   Intencion,
+  NivelTerritorial,
   NuevaDonacion,
+  NuevaInstitucion,
   NuevaIntencion,
   Pagina,
   PerfilDonante,
   Reconocimiento,
   RegistroDonante,
+  TerritorioRegistrado,
   TokenEmitido,
   Transicion,
   Umbral,
@@ -43,6 +55,8 @@ export interface ServicioIdentidad {
   cerrarSesion(): Promise<void>
   /** GET /v1/usuarios/me */
   obtenerUsuarioActual(): Promise<UsuarioSesion>
+  /** POST /v1/cuentas-donante — publico, idempotente con la clave dada; devuelve el id de la cuenta */
+  crearCuentaDonante(cuenta: CuentaDonanteNueva, claveIdempotencia: string): Promise<string>
 }
 
 /** Servicio de Donacion, M1 — DD 15.4, Tablas 34 y 35. */
@@ -51,8 +65,8 @@ export interface ServicioDonantes {
   registrarIntencion(datos: NuevaIntencion): Promise<{ codigo: string; expiraEn: string }>
   /** GET /v1/intenciones/{codigo} — publico; el operador ve ademas grupo y municipio */
   consultarIntencion(codigo: string): Promise<Intencion>
-  /** POST /v1/donantes — publico, idempotente; crea la cuenta y el perfil */
-  registrarDonante(datos: RegistroDonante): Promise<void>
+  /** POST /v1/donantes — con la sesion de la cuenta del donante; crea su perfil */
+  registrarDonante(datos: RegistroDonante, claveIdempotencia: string): Promise<void>
   /** GET /v1/donantes/me */
   obtenerPerfil(): Promise<PerfilDonante>
   /** PUT /v1/donantes/me — nombre, contacto y municipio */
@@ -75,6 +89,10 @@ export interface ServicioDonantes {
 export interface ServicioCampanias {
   /** GET /v1/campanias — publico; con rol institucional, las de su jurisdiccion */
   listar(filtro?: { territorioRuta?: string }): Promise<Campania[]>
+  /** POST /v1/campanias — U4; nace en borrador con el territorio de su institución */
+  crear(datos: DatosCampania): Promise<Campania>
+  /** PUT /v1/campanias/{id} — U4, solo en borrador */
+  editar(id: string, cambio: Partial<DatosCampania>): Promise<Campania>
   /** POST /v1/campanias/{id}/publicacion — U4 */
   publicar(id: string): Promise<Campania>
   /** POST /v1/campanias/{id}/cierre — U4 */
@@ -123,10 +141,31 @@ export interface ServicioInventario {
   atenderAlerta(id: string): Promise<Alerta>
 }
 
+/** Servicio Institucional, M6, M7 y ST2 — DD 15.2, Tabla 32. */
+export interface ServicioInstitucional {
+  /** GET /v1/territorios — U4 a U7, acotado a la jurisdicción */
+  listarTerritorios(filtro?: { nivel?: NivelTerritorial; padreId?: string; tamano?: number }): Promise<Pagina<TerritorioRegistrado>>
+  /** POST /v1/territorios — U6; la ruta la calcula el servicio */
+  crearTerritorio(codigoDivipola: string, nombre: string): Promise<TerritorioRegistrado>
+  /** GET /v1/instituciones — U4 a U7, acotado a la jurisdicción */
+  listarInstituciones(filtro?: FiltroInstituciones): Promise<Pagina<Institucion>>
+  /** GET /v1/instituciones/{id} — todo perfil con cuenta */
+  obtenerInstitucion(id: string): Promise<Institucion>
+  /** POST /v1/instituciones — U5 en su jurisdicción, U6 */
+  crearInstitucion(datos: NuevaInstitucion): Promise<Institucion>
+  /** PUT /v1/instituciones/{id} — U5 en su jurisdicción, U6; el tipo no cambia */
+  modificarInstitucion(id: string, cambio: CambioInstitucion): Promise<Institucion>
+  /** GET /v1/indicadores — U4, U5, U6 */
+  consultarIndicadores(filtro?: FiltroIndicadores): Promise<Indicadores>
+  /** GET /v1/auditoria — U7 */
+  consultarBitacora(filtro?: FiltroBitacora): Promise<Bitacora>
+}
+
 export interface Api {
   identidad: ServicioIdentidad
   donantes: ServicioDonantes
   campanias: ServicioCampanias
   trazabilidad: ServicioTrazabilidad
   inventario: ServicioInventario
+  institucional: ServicioInstitucional
 }

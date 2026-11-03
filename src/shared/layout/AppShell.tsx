@@ -5,6 +5,7 @@ import { DialogoSesionExpirada } from '@/shared/sesion/DialogoSesionExpirada'
 import { esInstitucional } from '@/shared/datos/roles'
 import { navegacionDe, RUTA_INICIAL } from './navegacion'
 import type { IconoNav } from './navegacion'
+import { NombreInstitucion } from '@/shared/institucional/NombreInstitucion'
 import { unir } from '@/shared/ui/Primitivos'
 import { Marca } from './Isotipo'
 import {
@@ -13,7 +14,10 @@ import {
   IconoCalendario,
   IconoCorazon,
   IconoEntrar,
+  IconoEscudo,
   IconoGota,
+  IconoGrafica,
+  IconoHospital,
   IconoInventario,
   IconoMedalla,
   IconoPersona,
@@ -32,6 +36,10 @@ const ICONOS: Record<IconoNav, typeof IconoGota> = {
   inventario: IconoInventario,
   alerta: IconoAlerta,
   calendario: IconoCalendario,
+  ubicacion: IconoUbicacion,
+  institucion: IconoHospital,
+  grafica: IconoGrafica,
+  escudo: IconoEscudo,
 }
 
 export function AppShell() {
@@ -151,7 +159,11 @@ export function AppShell() {
               {esInstitucional(rol.id) && (
                 <span className="flex items-center gap-1.5 text-texto-gris">
                   <IconoUbicacion className="h-3.5 w-3.5 text-vino-400" />
-                  {usuario.jurisdiccion.etiqueta}
+                  {usuario.jurisdiccion.institucionId ? (
+                    <NombreInstitucion id={usuario.jurisdiccion.institucionId} />
+                  ) : (
+                    usuario.jurisdiccion.etiqueta
+                  )}
                 </span>
               )}
             </div>

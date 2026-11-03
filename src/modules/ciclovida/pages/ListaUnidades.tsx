@@ -2,7 +2,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useConsulta } from '@/shared/consulta/useConsulta'
 import { EstadoDeConsulta } from '@/shared/consulta/EstadoDeConsulta'
 import { COMPONENTES, ESTADOS_UNIDAD, ETIQUETA_COMPONENTE, ETIQUETA_ESTADO_UNIDAD } from '@/shared/datos/catalogos'
-import { fechaCorta, hoy, idCorto } from '@/shared/formato'
+import { fechaCorta, hoy, idCorto, jurisdiccionEnFrase } from '@/shared/formato'
+import { NombreInstitucion } from '@/shared/institucional/NombreInstitucion'
 import { useSesion } from '@/shared/sesion/SesionContexto'
 import { Boton, EstadoVacio, Fila, Selector, Tabla, Td, Th, TituloSeccion, unir } from '@/shared/ui/Primitivos'
 import { InsigniaEstadoUnidad } from '@/shared/ui/EstadoUnidad'
@@ -15,7 +16,8 @@ import type { ComponenteSanguineo, EstadoUnidad, Pagina, Unidad } from '@/shared
  * M3-U3-03 — Unidades bajo custodia de la institución (GET /v1/unidades).
  *
  * Los filtros y la página viven en la URL: se pueden compartir y sobreviven a
- * recargar. U3 opera las unidades; U4 las consulta.
+ * recargar. U3 opera las unidades; U4 las consulta, y U5 y U6 consultan las
+ * de los bancos de su jurisdicción, con el banco custodio de cada una.
  */
 
 const TAMANO = 25
@@ -23,6 +25,7 @@ const TAMANO = 25
 export function ListaUnidades() {
   useTituloPagina('Unidades')
   const { usuario } = useSesion()
+  const territorial = usuario?.rol === 'U5' || usuario?.rol === 'U6'
   const [parametros, setParametros] = useSearchParams()
   const estado = (parametros.get('estado') ?? '') as EstadoUnidad | ''
   const componente = (parametros.get('componente') ?? '') as ComponenteSanguineo | ''
@@ -54,7 +57,9 @@ export function ListaUnidades() {
         descripcion={
           usuario?.rol === 'U3'
             ? 'Las unidades bajo custodia de tu banco. Abre una para registrar el siguiente paso.'
-            : 'Las unidades bajo custodia de tu banco, en consulta.'
+            : territorial
+              ? `Las unidades bajo custodia de los bancos de ${jurisdiccionEnFrase(usuario?.jurisdiccion)}, en consulta.`
+              : 'Las unidades bajo custodia de tu banco, en consulta.'
         }
       >
         Unidades
@@ -81,13 +86,30 @@ export function ListaUnidades() {
 
       {consulta.estado === 'cargando' && consulta.datos && <CargandoLinea />}
       <EstadoDeConsulta consulta={consulta}>
-        {(datos) => <Listado datos={datos} onPagina={(p) => cambiar('pagina', p === 0 ? '' : String(p))} filtrado={!!(estado || componente)} />}
+        {(datos) => (
+          <Listado
+            datos={datos}
+            conBanco={territorial}
+            onPagina={(p) => cambiar('pagina', p === 0 ? '' : String(p))}
+            filtrado={!!(estado || componente)}
+          />
+        )}
       </EstadoDeConsulta>
     </div>
   )
 }
 
-function Listado({ datos, onPagina, filtrado }: { datos: Pagina<Unidad>; onPagina: (p: number) => void; filtrado: boolean }) {
+function Listado({
+  datos,
+  conBanco,
+  onPagina,
+  filtrado,
+}: {
+  datos: Pagina<Unidad>
+  conBanco: boolean
+  onPagina: (p: number) => void
+  filtrado: boolean
+}) {
   if (datos.elementos.length === 0) {
     return (
       <EstadoVacio titulo={filtrado ? 'Ninguna unidad coincide con los filtros' : 'Aún no hay unidades'} icono={<IconoRegistro />}>
@@ -104,6 +126,7 @@ function Listado({ datos, onPagina, filtrado }: { datos: Pagina<Unidad>; onPagin
         <thead>
           <tr>
             <Th>Unidad</Th>
+            {conBanco && <Th>Banco</Th>}
             <Th>Componente</Th>
             <Th>Grupo</Th>
             <Th>Estado</Th>
@@ -122,6 +145,11 @@ function Listado({ datos, onPagina, filtrado }: { datos: Pagina<Unidad>; onPagin
                     {idCorto(u.id)}
                   </Link>
                 </Td>
+                {conBanco && (
+                  <Td>
+                    <NombreInstitucion id={u.institucionCustodiaId} />
+                  </Td>
+                )}
                 <Td>{ETIQUETA_COMPONENTE[u.componente]}</Td>
                 <Td className="font-bold">{u.grupo}</Td>
                 <Td>

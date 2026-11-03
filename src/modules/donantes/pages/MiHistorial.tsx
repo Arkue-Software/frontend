@@ -12,9 +12,10 @@ import type { DonacionPropia } from '@/shared/tipos'
  * M1-U2-05 — Mi historial de donaciones (GET /v1/donantes/me/donaciones).
  * M1-U2-06 — Historial vacío.
  *
- * DD V3.0, decisión D-01: cada entrada muestra la fecha y si fue en una
- * jornada, con un mensaje neutro idéntico para todo donante. NO muestra
- * resultado de tamizaje ni destino de las unidades derivadas.
+ * DD V3.0, decisión D-01: cada entrada muestra la fecha, el banco donde se
+ * donó y la jornada si la hubo, con un mensaje neutro idéntico para todo
+ * donante. NO muestra resultado de tamizaje ni destino de las unidades
+ * derivadas.
  */
 export function MiHistorial() {
   useTituloPagina('Mi historial')
@@ -86,6 +87,10 @@ function Historial({ donaciones }: { donaciones: DonacionPropia[] }) {
                       {d.campaniaId ? 'En jornada' : 'Donación espontánea'}
                     </span>
                   </div>
+                  <p className="mt-1 text-sm font-semibold text-vino-700">
+                    {d.institucionNombre ?? 'Banco de sangre'}
+                    {d.campaniaNombre && <span className="font-normal text-texto-gris"> · {d.campaniaNombre}</span>}
+                  </p>
                   <p className="mt-2 text-sm leading-relaxed text-texto-gris">{d.mensaje}</p>
                 </Tarjeta>
               </div>

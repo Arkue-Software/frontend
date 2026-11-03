@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import type { ErrorApi } from '@/api/errores'
 import { useAccion, useConsulta } from '@/shared/consulta/useConsulta'
 import { COMPONENTES, ETIQUETA_COMPONENTE, GRUPOS_SANGUINEOS } from '@/shared/datos/catalogos'
-import { codigoLegible, fecha, fechaCorta, hoy, idCorto } from '@/shared/formato'
+import { codigoLegible, fecha, fechaCorta, idCorto } from '@/shared/formato'
 import {
   Aviso,
   Boton,
@@ -110,6 +110,8 @@ function Formulario({ donanteInicial, onRegistrada }: { donanteInicial: DonanteP
   async function registrar() {
     const d = await registro.ejecutar()
     if (d) onRegistrada(d)
+    // Si la jornada dejó de estar vigente, la lista se vuelve a pedir para no ofrecerla otra vez.
+    else if (campaniaId) campanias.recargar()
   }
 
   return (
@@ -219,9 +221,14 @@ function Formulario({ donanteInicial, onRegistrada }: { donanteInicial: DonanteP
   )
 }
 
+/**
+ * Vigente ahora mismo, con la misma regla que Donación aplica al registrar:
+ * el instante de la captación cae entre el inicio y el fin de la jornada. Se
+ * comparan instantes, no fechas, para que la zona horaria no cambie el día.
+ */
 function campaniaVigente(c: Campania): boolean {
-  const dia = hoy()
-  return c.estado === 'publicada' && c.iniciaEn.slice(0, 10) <= dia && dia <= c.terminaEn.slice(0, 10)
+  const ahora = Date.now()
+  return c.estado === 'publicada' && Date.parse(c.iniciaEn) <= ahora && ahora <= Date.parse(c.terminaEn)
 }
 
 function mensajeRegistro(e: ErrorApi): string {
@@ -235,6 +242,7 @@ function mensajeRegistro(e: ErrorApi): string {
   }
   if (e.estado === 400) return e.detalle
   if (e.estado === 404) return 'No encontramos al donante o el código indicado.'
+  if (e.estado === 409) return 'La jornada elegida ya no está vigente. Elige otra o registra la donación sin jornada.'
   return 'No pudimos registrar la donación. Inténtalo de nuevo; si ya se registró, no se duplicará.'
 }
 

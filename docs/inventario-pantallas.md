@@ -11,23 +11,28 @@
 
 Este documento **no contiene mockups**. Define qué pantallas existen, quién las usa, qué requerimiento cubre cada una y cómo se refleja en ella cada restricción no negociable. El prototipo de alta fidelidad se construye a partir de aquí, no antes.
 
-## 0. Estado de implementación (versión para QA, 2026-10)
+## 0. Estado de implementación (versión para QA, 2026-11)
 
-La web ya no es un prototipo: todas las pantallas implementadas consumen los servicios reales a través de APISIX (`/api/v1/...`) y no hay datos sintéticos. El alcance lo recorta la ausencia del Servicio Institucional.
+La web ya no es un prototipo: todas las pantallas implementadas consumen los servicios reales a través de APISIX (`/api/v1/...`) y no hay datos sintéticos. Este inventario usa la numeración anterior de módulos: su M5 «Red territorial» es el M6 del DD V3.0, y su M6 «Analítica» es el M7.
 
 | Pantallas | Ruta | Servicio |
 |---|---|---|
 | TR-01/02 Inicio de sesión, TR-05 sesión expirada, cierre de sesión | `/ingresar`, diálogo global | Identidad |
 | TR-03 Navegación por rol, TR-04 denegación, no encontrado | todas | — |
 | M1-U1-01 a 04 Registro anónimo, M1-U1-06 consulta por código | `/donar`, `/donar/consulta` | Donación |
-| M1-U2-01/02 Crear cuenta y consentimiento | `/registro` | Donación → Identidad |
+| M1-U2-01/02 Crear cuenta y consentimiento: la cuenta en Identidad, la sesión y el perfil en Donación, solo para mayores de 18 años; `/donantes/completar` termina un registro interrumpido | `/registro`, `/donantes/completar` | Identidad, Donación |
 | M1-U2-03 a 08 Perfil, elegibilidad, contacto, historial, reconocimientos | `/donantes/*` | Donación |
 | M1-U3-01/02 Donante presente | `/donantes/consulta` | Donación |
-| M2 Jornadas públicas y campañas de la jurisdicción | `/jornadas`, `/campanias` | Campañas |
-| M3 Registro de donación, fraccionamiento, unidades y acciones de los 9 estados | `/ciclovida/*` | Donación |
-| M4 Inventario, umbrales y alertas del banco | `/inventario`, `/inventario/alertas` | Donación |
+| M2 Jornadas públicas, campañas de la jurisdicción; U4 crea y edita borradores | `/jornadas`, `/campanias` | Campañas (con el nombre del banco de su copia de instituciones) |
+| M3 Registro de donación, fraccionamiento, unidades y acciones de los 9 estados; U5 y U6 en lectura de su territorio (M3-U5-01, M3-U6-01); U7 trazabilidad desde la bitácora (M3-U7-01) | `/ciclovida/*` | Donación (jornadas vigentes en este instante, de Campañas) |
+| M4 Inventario, umbrales y alertas del banco; inventario agregado de la jurisdicción (M4-U5-01, M4-U6-01) con desglose por banco; alertas en lectura para U5 | `/inventario`, `/inventario/alertas` | Donación; se vuelven a pedir cada 30 s mientras la pestaña está visible |
+| M5 (DD: M6) Jerarquía territorial (M5-U6-01) y alta de territorio; instituciones de la jurisdicción (M5-U5-01/02), alta, cambio y baja (M5-U6-02/03) | `/territorios`, `/instituciones` | Institucional |
+| M6 (DD: M7) Indicadores: captación con supresión por agregación, existencias y cobertura | `/indicadores` | Institucional (cifras que Donación le envía por Kafka, con su fecha) |
+| TR-07/08 Bitácora de los cuatro contextos, agrupada por correlación, con hasta cuándo está al día cada serie | `/auditoria` | Institucional (series que le llegan por Kafka) |
 
-**Diferido hasta el Servicio Institucional:** transferencias (M4-U4-01 a 06), vistas territoriales y nacional de inventario, bitácora (TR-07), M5 y M6. U7 inicia sesión y ve un aviso de que aún no hay módulos para su perfil. Sin Institucional tampoco hay nombres de banco: la jurisdicción institucional se presenta como «tu banco».
+La web solo habla con el gateway, y los servicios no se llaman entre sí: lo que un servicio sabe de otro le llega por Kafka. Las jornadas y el historial del donante traen el nombre del banco en su propia respuesta. Las demás pantallas lo resuelven con `GET /v1/instituciones/{id}`, una vez por banco y por sesión del navegador; si Institucional no responde, se lee «Institución no disponible».
+
+**Fuera de esta versión:** transferencias y convocatorias (M4-U4-01 a 06), que dependen del proceso de escalamiento, y la asignación de jurisdicción a un usuario (M5-U6-04, RF-22), que es una operación de Identidad. M4-U7-01 no se ofrece: la matriz normativa del DD (15.5) no da a U7 lectura del inventario.
 
 ---
 

@@ -14,8 +14,9 @@ import type { Campania } from '@/shared/tipos'
 /**
  * M2-U1-01 a 03 y M2-U2-01 — Jornadas de donación publicadas
  * (GET /v1/campanias, público). Ordenadas por fecha, filtradas por territorio
- * DIVIPOLA sin llamar a ningún otro servicio. Una jornada con cupos agotados
- * ofrece la siguiente fecha del mismo banco.
+ * DIVIPOLA sin llamar a ningún otro servicio. Cada jornada trae el nombre de
+ * su banco, que Campañas guarda de los eventos de Institucional. Una jornada
+ * con cupos agotados ofrece la siguiente fecha del mismo banco.
  */
 export function Jornadas() {
   useTituloPagina('Jornadas de donación')
@@ -147,6 +148,7 @@ function TarjetaJornada({ campania: c, siguiente }: { campania: Campania; siguie
           <Etiqueta tono="exito">{c.cupoDisponible} cupos disponibles</Etiqueta>
         )}
       </div>
+      {c.institucionNombre && <p className="mt-1 text-sm font-semibold text-vino-700">{c.institucionNombre}</p>}
       {c.descripcion && <p className="mt-2 text-sm leading-relaxed text-texto-gris">{c.descripcion}</p>}
       <dl className="mt-4 space-y-2 text-sm text-texto-gris">
         <div className="flex items-start gap-2">
@@ -168,7 +170,7 @@ function TarjetaJornada({ campania: c, siguiente }: { campania: Campania; siguie
       </dl>
       {agotada && siguiente && (
         <p className="mt-4 rounded-suave border border-vino-100 bg-vino-50 px-3 py-2 text-xs text-vino-800">
-          El mismo banco tiene otra jornada el {fecha(siguiente.iniciaEn)}: {siguiente.nombre}.
+          {c.institucionNombre ?? 'El mismo banco'} tiene otra jornada el {fecha(siguiente.iniciaEn)}: {siguiente.nombre}.
         </p>
       )}
     </Tarjeta>

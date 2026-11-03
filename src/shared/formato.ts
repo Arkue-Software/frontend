@@ -54,3 +54,24 @@ export function codigoLegible(codigo: string): string {
 export function hoy(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: ZONA }).format(new Date())
 }
+
+/**
+ * Si quien nació en `nacimiento` (AAAA-MM-DD) ya cumplió `anios` el día
+ * `dia`. Se compara el texto de las fechas, que ordena como el tiempo; quien
+ * nació un 29 de febrero los cumple el 1 de marzo en un año no bisiesto.
+ */
+export function cumplioAnios(nacimiento: string, anios: number, dia: string): boolean {
+  const aniversario = String(Number(nacimiento.slice(0, 4)) + anios).padStart(4, '0') + nacimiento.slice(4)
+  return aniversario <= dia
+}
+
+/**
+ * La jurisdicción dentro de una frase: «Campañas de Antioquia», «de todo el
+ * país», «de tu banco de sangre». Un nombre de territorio es nombre propio y
+ * conserva sus mayúsculas.
+ */
+export function jurisdiccionEnFrase(j: { ambito: string; etiqueta: string; territorioRuta?: string } | undefined): string {
+  if (!j) return 'tu jurisdicción'
+  if (j.ambito === 'territorio') return j.territorioRuta === '/00' ? 'todo el país' : j.etiqueta
+  return j.etiqueta.charAt(0).toLowerCase() + j.etiqueta.slice(1)
+}

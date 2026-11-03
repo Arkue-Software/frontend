@@ -56,6 +56,9 @@ export function MiPerfil() {
           confirmación con el enlace para entrar; si no lo ves en unos minutos, revisa la carpeta de spam.
         </Aviso>
       )}
+      {consulta.estado === 'error' && consulta.error.estado === 404 ? (
+        <SinPerfil />
+      ) : (
       <EstadoDeConsulta consulta={consulta}>
         {(datos) => (
           <ContenidoPerfil
@@ -65,7 +68,30 @@ export function MiPerfil() {
           />
         )}
       </EstadoDeConsulta>
+      )}
     </div>
+  )
+}
+
+/**
+ * La cuenta existe pero el perfil no: el registro se interrumpió después de
+ * crear la cuenta. Se completa con la sesión ya abierta.
+ */
+function SinPerfil() {
+  return (
+    <Tarjeta enmarcada>
+      <div className="space-y-4">
+        <Etiqueta>Falta un paso</Etiqueta>
+        <h1 className="text-2xl font-bold tracking-tight text-vino-800">Completa tu registro de donante</h1>
+        <p className="text-sm leading-relaxed text-texto-gris">
+          Tu cuenta está creada, pero todavía no tiene tus datos de donante. Con ellos el banco te reconoce y calculamos
+          cuándo vuelves a poder donar.
+        </p>
+        <Link to="/donantes/completar" className="inline-flex font-bold text-vino-700 underline underline-offset-4">
+          Completar mi registro
+        </Link>
+      </div>
+    </Tarjeta>
   )
 }
 

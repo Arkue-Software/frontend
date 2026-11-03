@@ -1,19 +1,21 @@
 import { useState } from 'react'
+import { FormularioCampania } from '@/modules/campanas/FormularioCampania'
+import { NombreInstitucion } from '@/shared/institucional/NombreInstitucion'
 import { useAccion, useConsulta } from '@/shared/consulta/useConsulta'
 import { EstadoDeConsulta } from '@/shared/consulta/EstadoDeConsulta'
 import { nombreCompletoMunicipio } from '@/shared/datos/divipola'
-import { fechaHora } from '@/shared/formato'
+import { fechaHora, jurisdiccionEnFrase } from '@/shared/formato'
 import { useSesion } from '@/shared/sesion/SesionContexto'
 import { Aviso, Boton, EstadoVacio, Tabla, Td, Th, TituloSeccion, unir } from '@/shared/ui/Primitivos'
 import { DialogoConfirmacion } from '@/shared/ui/DialogoConfirmacion'
-import { IconoCalendario } from '@/shared/ui/Iconos'
+import { IconoCalendario, IconoRegistro } from '@/shared/ui/Iconos'
 import { useTituloPagina } from '@/shared/useTituloPagina'
 import type { Campania, EstadoCampania } from '@/shared/tipos'
 
 /**
  * M2-U3-01, M2-U4-01 a 04, M2-U5-01 y M2-U6-01 — Campañas de la jurisdicción
- * (GET /v1/campanias con rol institucional). El administrador de banco publica
- * y cierra; los demás perfiles consultan. Publicar envía el evento a Donación
+ * (GET /v1/campanias con rol institucional). El administrador de banco crea,
+ * edita en borrador, publica y cierra; los demás perfiles consultan. Publicar envía el evento a Donación
  * por Kafka, que la confirma al registrar donaciones y avisa a los donantes.
  */
 
@@ -28,6 +30,9 @@ export function CampaniasJurisdiccion() {
   useTituloPagina('Campañas')
   const { rol, usuario } = useSesion()
   const puedeEscribir = rol.id === 'U4'
+  const territorial = rol.id === 'U5' || rol.id === 'U6'
+  // null: cerrado; 'nueva': crear; una campaña: editar ese borrador.
+  const [formulario, setFormulario] = useState<Campania | 'nueva' | null>(null)
   const consulta = useConsulta((api) => api.campanias.listar(), [])
   const [pendiente, setPendiente] = useState<{ campania: Campania; accion: 'publicar' | 'cerrar' } | null>(null)
   const cambio = useAccion((api, id: string, accion: 'publicar' | 'cerrar') =>
@@ -45,9 +50,16 @@ export function CampaniasJurisdiccion() {
 
   return (
     <div className="space-y-5">
-      <TituloSeccion descripcion={`Campañas de ${usuario?.jurisdiccion.etiqueta.toLowerCase() ?? 'tu jurisdicción'}.`}>
-        Campañas
-      </TituloSeccion>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <TituloSeccion descripcion={`Campañas de ${jurisdiccionEnFrase(usuario?.jurisdiccion)}.`}>
+          Campañas
+        </TituloSeccion>
+        {puedeEscribir && (
+          <Boton icono={<IconoCalendario />} onClick={() => setFormulario('nueva')}>
+            Nueva campaña
+          </Boton>
+        )}
+      </div>
 
       <EstadoDeConsulta consulta={consulta}>
         {(campanias) =>
@@ -60,6 +72,7 @@ export function CampaniasJurisdiccion() {
               <thead>
                 <tr>
                   <Th>Campaña</Th>
+                  {territorial && <Th>Banco</Th>}
                   <Th>Sede</Th>
                   <Th>Fechas</Th>
                   <Th>Estado</Th>
@@ -74,6 +87,11 @@ export function CampaniasJurisdiccion() {
                   .map((c) => (
                     <tr key={c.id}>
                       <Td className="font-bold text-vino-800">{c.nombre}</Td>
+                      {territorial && (
+                        <Td>
+                          {c.institucionNombre ?? <NombreInstitucion id={c.institucionId} />}
+                        </Td>
+                      )}
                       <Td>
                         {c.sede}
                         <span className="block text-xs text-texto-tenue">{nombreCompletoMunicipio(c.territorioCodigo)}</span>
@@ -99,9 +117,14 @@ export function CampaniasJurisdiccion() {
                       {puedeEscribir && (
                         <Td>
                           {c.estado === 'borrador' && (
-                            <Boton variante="texto" onClick={() => setPendiente({ campania: c, accion: 'publicar' })}>
-                              Publicar
-                            </Boton>
+                            <div className="flex flex-wrap gap-1">
+                              <Boton variante="texto" icono={<IconoRegistro />} onClick={() => setFormulario(c)}>
+                                Editar
+                              </Boton>
+                              <Boton variante="texto" onClick={() => setPendiente({ campania: c, accion: 'publicar' })}>
+                                Publicar
+                              </Boton>
+                            </div>
                           )}
                           {c.estado === 'publicada' && (
                             <Boton variante="texto" onClick={() => setPendiente({ campania: c, accion: 'cerrar' })}>
@@ -122,6 +145,22 @@ export function CampaniasJurisdiccion() {
         Es un conteo de donaciones asociadas a cada campaña. No identifica a ningún donante ni indica el resultado de
         las unidades.
       </Aviso>
+
+      {formulario !== null && (
+        <FormularioCampania
+          campania={formulario === 'nueva' ? null : formulario}
+          onCerrar={() => setFormulario(null)}
+          onGuardada={(guardada) => {
+            const actuales = consulta.datos ?? []
+            consulta.establecer(
+              actuales.some((c) => c.id === guardada.id)
+                ? actuales.map((c) => (c.id === guardada.id ? guardada : c))
+                : [guardada, ...actuales],
+            )
+            setFormulario(null)
+          }}
+        />
+      )}
 
       <DialogoConfirmacion
         abierto={pendiente !== null}

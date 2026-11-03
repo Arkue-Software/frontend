@@ -3,22 +3,31 @@ import { Link } from 'react-router-dom'
 import type { Api } from '@/api/contratos'
 import { useAccion, useConsulta } from '@/shared/consulta/useConsulta'
 import { EstadoDeConsulta } from '@/shared/consulta/EstadoDeConsulta'
+import { useRecargaPeriodica } from '@/shared/consulta/useRecargaPeriodica'
 import { COMPONENTES, ETIQUETA_COMPONENTE, GRUPOS_SANGUINEOS } from '@/shared/datos/catalogos'
-import { fechaCorta, hoy } from '@/shared/formato'
+import { fechaCorta, hoy, jurisdiccionEnFrase } from '@/shared/formato'
+import { NombreInstitucion } from '@/shared/institucional/NombreInstitucion'
 import { useSesion } from '@/shared/sesion/SesionContexto'
 import { DialogoConfirmacion } from '@/shared/ui/DialogoConfirmacion'
 import { Boton, Dato, Tabla, Td, Th, TituloSeccion, unir } from '@/shared/ui/Primitivos'
 import { IconoAlerta, IconoCerrar, IconoInventario, IconoReloj } from '@/shared/ui/Iconos'
 import { useTituloPagina } from '@/shared/useTituloPagina'
-import type { Alerta, ComponenteSanguineo, Existencia, GrupoSanguineo, Umbral } from '@/shared/tipos'
+import type { Alerta, ComponenteSanguineo, Existencia, GrupoSanguineo, RolId, Umbral } from '@/shared/tipos'
 
 /**
  * M4-U3-01 / M4-U4-01 — Inventario del banco (GET /v1/inventario).
  * M4-U4-02 — Umbrales de escasez y vencimiento (GET/PUT /v1/inventario/umbrales).
+ * M4-U5-01 / M4-U6-01 — Inventario de los bancos de la jurisdicción, en
+ * lectura: la matriz suma los bancos y una tabla los desglosa. Los umbrales
+ * son de cada banco y solo los ven su operador y su administrador.
  *
  * La matriz cruza componente y grupo. Una celda se marca cuando queda por
  * debajo de su umbral o cuando su unidad más próxima vence dentro del plazo
  * configurado. El umbral de un grupo concreto prevalece sobre el general.
+ *
+ * Las existencias cambian con lo que hacen todos los operadores del banco: la
+ * pantalla se vuelve a pedir sola. Al guardar un umbral, Donación reevalúa las
+ * alertas en la misma operación, así que se recargan también.
  */
 
 interface DatosInventario {
@@ -27,24 +36,35 @@ interface DatosInventario {
   alertasAbiertas: Alerta[]
 }
 
-const cargar = async (api: Api): Promise<DatosInventario> => {
+/** Lo que cada perfil puede leer (DD 15.5, grupos 7 y 8): U6 no ve alertas; U5 y U6 no ven umbrales. */
+const cargar = async (api: Api, rol: RolId): Promise<DatosInventario> => {
+  const deBanco = rol === 'U3' || rol === 'U4'
   const [existencias, umbrales, alertasAbiertas] = await Promise.all([
     api.inventario.consultarExistencias(),
-    api.inventario.consultarUmbrales(),
-    api.inventario.listarAlertas('abierta'),
+    deBanco ? api.inventario.consultarUmbrales() : Promise.resolve([]),
+    rol === 'U6' ? Promise.resolve([]) : api.inventario.listarAlertas('abierta'),
   ])
   return { existencias, umbrales, alertasAbiertas }
 }
 
 export function PanelInventario() {
   useTituloPagina('Inventario')
-  const consulta = useConsulta(cargar, [])
-  const { usuario } = useSesion()
-  const administra = usuario?.rol === 'U4'
+  const { rol, usuario } = useSesion()
+  const consulta = useConsulta((api) => cargar(api, rol.id), [rol.id])
+  useRecargaPeriodica(consulta.recargar)
+  const administra = rol.id === 'U4'
+  const territorial = rol.id === 'U5' || rol.id === 'U6'
 
   return (
     <div className="space-y-6">
-      <TituloSeccion etiqueta="Inventario" descripcion="Unidades disponibles de tu banco por componente y grupo sanguíneo.">
+      <TituloSeccion
+        etiqueta="Inventario"
+        descripcion={
+          territorial
+            ? `Unidades disponibles en los bancos de ${jurisdiccionEnFrase(usuario?.jurisdiccion)}, por componente y grupo sanguíneo.`
+            : 'Unidades disponibles de tu banco por componente y grupo sanguíneo.'
+        }
+      >
         Inventario
       </TituloSeccion>
       <EstadoDeConsulta consulta={consulta}>
@@ -52,7 +72,12 @@ export function PanelInventario() {
           <Panel
             datos={datos}
             administra={administra}
-            onUmbrales={(umbrales) => consulta.establecer({ ...datos, umbrales })}
+            territorial={territorial}
+            conAlertas={rol.id !== 'U6'}
+            onUmbrales={(umbrales) => {
+              consulta.establecer({ ...datos, umbrales })
+              consulta.recargar()
+            }}
           />
         )}
       </EstadoDeConsulta>
@@ -73,9 +98,27 @@ function diasHasta(fechaIso: string): number {
   return Math.round((Date.UTC(a2, m2 - 1, d2) - Date.UTC(a, m - 1, d)) / 86_400_000)
 }
 
-function Panel({ datos, administra, onUmbrales }: { datos: DatosInventario; administra: boolean; onUmbrales: (u: Umbral[]) => void }) {
+function Panel({
+  datos,
+  administra,
+  territorial,
+  conAlertas,
+  onUmbrales,
+}: {
+  datos: DatosInventario
+  administra: boolean
+  territorial: boolean
+  conAlertas: boolean
+  onUmbrales: (u: Umbral[]) => void
+}) {
   const [editando, setEditando] = useState(false)
-  const celda = (c: ComponenteSanguineo, g: GrupoSanguineo) => datos.existencias.find((e) => e.componente === c && e.grupo === g)
+  // Con varios bancos, cada celda suma sus existencias y toma el vencimiento más próximo.
+  const celda = (c: ComponenteSanguineo, g: GrupoSanguineo): Pick<Existencia, 'disponibles' | 'vencimientoMasProximo'> | undefined => {
+    const filas = datos.existencias.filter((e) => e.componente === c && e.grupo === g)
+    if (filas.length === 0) return undefined
+    const vencimientos = filas.map((e) => e.vencimientoMasProximo).filter((v): v is string => v !== null).sort()
+    return { disponibles: filas.reduce((s, e) => s + e.disponibles, 0), vencimientoMasProximo: vencimientos[0] ?? null }
+  }
   const total = datos.existencias.reduce((s, e) => s + e.disponibles, 0)
   const escasez = datos.alertasAbiertas.filter((a) => a.tipo === 'escasez').length
   const vencimiento = datos.alertasAbiertas.filter((a) => a.tipo === 'vencimiento_proximo').length
@@ -84,8 +127,12 @@ function Panel({ datos, administra, onUmbrales }: { datos: DatosInventario; admi
     <>
       <div className="grid gap-4 sm:grid-cols-3">
         <Dato etiqueta="Unidades disponibles" valor={total} destacado icono={<IconoInventario className="h-5 w-5" />} />
-        <Dato etiqueta="Alertas de escasez" valor={escasez} nota="Abiertas" icono={<IconoAlerta className="h-5 w-5" />} />
-        <Dato etiqueta="Vencimientos próximos" valor={vencimiento} nota="Abiertas" icono={<IconoReloj className="h-5 w-5" />} />
+        {conAlertas && (
+          <>
+            <Dato etiqueta="Alertas de escasez" valor={escasez} nota="Abiertas" icono={<IconoAlerta className="h-5 w-5" />} />
+            <Dato etiqueta="Vencimientos próximos" valor={vencimiento} nota="Abiertas" icono={<IconoReloj className="h-5 w-5" />} />
+          </>
+        )}
       </div>
 
       <Tabla>
@@ -124,13 +171,19 @@ function Panel({ datos, administra, onUmbrales }: { datos: DatosInventario; admi
         </tbody>
       </Tabla>
       <p className="text-xs text-texto-tenue">
-        «Bajo» marca las celdas por debajo de su umbral mínimo. La fecha es la del vencimiento más próximo entre las unidades
-        disponibles.{' '}
-        <Link to="/inventario/alertas" className="font-bold text-vino-700 underline-offset-4 hover:underline">
-          Ver alertas
-        </Link>
+        {territorial
+          ? 'Suma de los bancos de tu jurisdicción. La fecha es la del vencimiento más próximo entre todas sus unidades disponibles.'
+          : '«Bajo» marca las celdas por debajo de su umbral mínimo. La fecha es la del vencimiento más próximo entre las unidades disponibles.'}{' '}
+        {conAlertas && (
+          <Link to="/inventario/alertas" className="font-bold text-vino-700 underline-offset-4 hover:underline">
+            Ver alertas
+          </Link>
+        )}
       </p>
 
+      {territorial && <PorBanco existencias={datos.existencias} />}
+
+      {!territorial && (
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-vino-800">Umbrales</h2>
@@ -167,6 +220,7 @@ function Panel({ datos, administra, onUmbrales }: { datos: DatosInventario; admi
           </Tabla>
         )}
       </section>
+      )}
 
       {editando && (
         <EditorUmbrales
@@ -179,6 +233,47 @@ function Panel({ datos, administra, onUmbrales }: { datos: DatosInventario; admi
         />
       )}
     </>
+  )
+}
+
+/** Desglose por banco de la jurisdicción (U5, U6). */
+function PorBanco({ existencias }: { existencias: Existencia[] }) {
+  const bancos = [...new Set(existencias.map((e) => e.institucionId))]
+  if (bancos.length === 0) return null
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-bold text-vino-800">Por banco</h2>
+      <Tabla>
+        <thead>
+          <tr>
+            <Th>Banco</Th>
+            {COMPONENTES.map((c) => (
+              <Th key={c}>{ETIQUETA_COMPONENTE[c]}</Th>
+            ))}
+            <Th>Total</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {bancos.map((b) => {
+            const suyas = existencias.filter((e) => e.institucionId === b)
+            const de = (c: ComponenteSanguineo) => suyas.filter((e) => e.componente === c).reduce((s, e) => s + e.disponibles, 0)
+            return (
+              <tr key={b}>
+                <Td className="font-bold text-vino-800">
+                  <NombreInstitucion id={b} conMunicipio />
+                </Td>
+                {COMPONENTES.map((c) => (
+                  <Td key={c} className="tabular-nums">
+                    {de(c)}
+                  </Td>
+                ))}
+                <Td className="font-bold tabular-nums">{suyas.reduce((s, e) => s + e.disponibles, 0)}</Td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </Tabla>
+    </section>
   )
 }
 
