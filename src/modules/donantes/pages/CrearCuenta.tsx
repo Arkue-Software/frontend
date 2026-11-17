@@ -6,6 +6,7 @@ import { useAccion } from '@/shared/consulta/useConsulta'
 import { nombreCompletoMunicipio } from '@/shared/datos/divipola'
 import { cumplioAnios, fecha, hoy } from '@/shared/formato'
 import { nuevoId } from '@/shared/utilidades/ids'
+import { errorNombre } from '@/shared/utilidades/nombres'
 import { useSesion } from '@/shared/sesion/SesionContexto'
 import { Aviso, Boton, CampoTexto, Etiqueta, MensajeError, Tarjeta, unir } from '@/shared/ui/Primitivos'
 import { IndicadorPasos } from '@/shared/ui/Pasos'
@@ -115,7 +116,8 @@ export function CrearCuenta({ completar = false }: { completar?: boolean }) {
       : !cumplioAnios(nacimiento, EDAD_MINIMA, hoy())
         ? `Para crear una cuenta de donante debes tener ${EDAD_MINIMA} años cumplidos.`
         : null
-  const identidadCompleta = nombre.trim() !== '' && documento && !errDocumento && nacimiento && !errNacimiento
+  const errNombre = errorNombre(nombre)
+  const identidadCompleta = nombre.trim() !== '' && !errNombre && documento && !errDocumento && nacimiento && !errNacimiento
 
   const errCorreo = correo && !CORREO.test(correo.trim()) ? 'Escribe un correo válido.' : null
   const errCredencial =
@@ -150,7 +152,7 @@ export function CrearCuenta({ completar = false }: { completar?: boolean }) {
                   Son los que permiten que el banco te reconozca y que calculemos cuándo vuelves a poder donar.
                 </p>
               </div>
-              <CampoTexto id="nombre" etiqueta="Nombre completo" valor={nombre} onCambio={setNombre} autoComplete="name" maxLength={120} />
+              <CampoTexto id="nombre" etiqueta="Nombre completo" valor={nombre} onCambio={setNombre} autoComplete="name" maxLength={120} error={errNombre} />
               <CampoTexto
                 id="documento"
                 etiqueta="Número de documento"

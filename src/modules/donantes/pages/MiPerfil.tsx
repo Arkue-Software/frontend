@@ -6,6 +6,7 @@ import { EstadoDeConsulta } from '@/shared/consulta/EstadoDeConsulta'
 import { COMPONENTES, ETIQUETA_COMPONENTE, VIDA_UTIL_COMPONENTE } from '@/shared/datos/catalogos'
 import { nombreCompletoMunicipio } from '@/shared/datos/divipola'
 import { fecha } from '@/shared/formato'
+import { errorNombre } from '@/shared/utilidades/nombres'
 import { Aviso, Boton, CampoTexto, Dato, Etiqueta, MensajeError, Tarjeta, unir } from '@/shared/ui/Primitivos'
 import { Revelar } from '@/shared/ui/Revelar'
 import { SelectorMunicipio } from '@/shared/ui/SelectorMunicipio'
@@ -225,7 +226,8 @@ function DatosContacto({ perfil, onGuardado }: { perfil: PerfilDonante; onGuarda
 
   const errCorreo = correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim()) ? 'Escribe un correo válido.' : null
   const errTelefono = telefono && !/^[0-9+ ]{7,20}$/.test(telefono.trim()) ? 'Solo números, espacios y el signo +.' : null
-  const valido = nombre.trim() !== '' && !errCorreo && !errTelefono
+  const errNombre = errorNombre(nombre)
+  const valido = nombre.trim() !== '' && !errNombre && !errCorreo && !errTelefono
 
   function cancelar() {
     setNombre(perfil.nombre)
@@ -266,7 +268,7 @@ function DatosContacto({ perfil, onGuardado }: { perfil: PerfilDonante; onGuarda
         </dl>
       ) : (
         <div className="mt-4 space-y-4">
-          <CampoTexto id="perfil-nombre" etiqueta="Nombre completo" valor={nombre} onCambio={setNombre} autoComplete="name" maxLength={120} />
+          <CampoTexto id="perfil-nombre" etiqueta="Nombre completo" valor={nombre} onCambio={setNombre} autoComplete="name" maxLength={120} error={errNombre} />
           <CampoTexto id="perfil-correo" etiqueta="Correo de contacto" tipo="email" valor={correo} onCambio={setCorreo} opcional autoComplete="email" maxLength={160} error={errCorreo} />
           <CampoTexto id="perfil-telefono" etiqueta="Teléfono" tipo="tel" valor={telefono} onCambio={setTelefono} opcional autoComplete="tel" error={errTelefono} />
           <div>
