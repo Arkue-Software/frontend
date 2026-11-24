@@ -49,6 +49,9 @@ const Instituciones = pagina(() => import('@/modules/institucional/pages/Institu
 const Indicadores = pagina(() => import('@/modules/institucional/pages/Indicadores'), 'Indicadores')
 const Bitacora = pagina(() => import('@/modules/institucional/pages/Bitacora'), 'Bitacora')
 
+// Administración de cuentas
+const Usuarios = pagina(() => import('@/features/usuarios/Usuarios'), 'Usuarios')
+
 // M4 — Inventario y alertas
 const PanelInventario = pagina(() => import('@/modules/inventario/pages/PanelInventario'), 'PanelInventario')
 const Alertas = pagina(() => import('@/modules/inventario/pages/Alertas'), 'Alertas')
@@ -90,6 +93,9 @@ export function App() {
         <Route path="instituciones" element={<Protegida roles={['U4', 'U5', 'U6', 'U7']}><Instituciones /></Protegida>} />
         <Route path="indicadores" element={<Protegida roles={['U4', 'U5', 'U6']}><Indicadores /></Protegida>} />
         <Route path="auditoria" element={<Protegida roles={['U7']}><Bitacora /></Protegida>} />
+
+        {/* Administración de cuentas */}
+        <Route path="usuarios" element={<Protegida roles={['U4', 'U5', 'U6']}><Usuarios /></Protegida>} />
 
         {/* Transversal */}
         <Route path="denegado" element={<Carga><Denegacion /></Carga>} />

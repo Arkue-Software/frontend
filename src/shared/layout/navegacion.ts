@@ -63,6 +63,9 @@ export const NAVEGACION: EntradaNav[] = [
   { etiqueta: 'Instituciones', ruta: '/instituciones', icono: 'institucion', roles: ['U4', 'U5', 'U6', 'U7'] },
   { etiqueta: 'Territorios', ruta: '/territorios', icono: 'ubicacion', roles: ['U4', 'U5', 'U6', 'U7'] },
 
+  // Administración de cuentas
+  { etiqueta: 'Usuarios', ruta: '/usuarios', icono: 'persona', roles: ['U4', 'U5', 'U6'] },
+
   // ST2 — Bitácora, solo el auditor
   { etiqueta: 'Bitácora', ruta: '/auditoria', icono: 'escudo', roles: ['U7'] },
 ]
